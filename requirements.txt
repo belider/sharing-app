@@ -1,13 +1,7 @@
 python-dotenv
 pip install icloudpy==0.6.0
 protobuf==5.27.3
-"pymongo[srv]"
+pymongo
 openai
 tiktoken
 certifi
-# pyicloud==0.10.2
-# click==8.0.3
-# flask
-# sentence-transformers
-# pymongo
-# schedule
