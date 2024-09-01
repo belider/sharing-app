@@ -1,5 +1,5 @@
 python-dotenv
-pip install icloudpy==0.6.0
+icloudpy==0.6.0
 protobuf==5.27.3
 pymongo
 openai
