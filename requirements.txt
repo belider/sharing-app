@@ -6,3 +6,4 @@ openai
 tiktoken
 certifi
 flask
+waitress

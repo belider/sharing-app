@@ -4,9 +4,14 @@ from db_service import DatabaseService
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 API_KEY = os.getenv('GPTS_API_KEY')
+IS_TEST_ENV = os.getenv('IS_TEST_ENV', 'false').lower() == 'true'
 
 app = Flask(__name__)
 db_service = DatabaseService()
@@ -62,4 +67,11 @@ def search():
     return jsonify({'response': response_text})
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    if IS_TEST_ENV:
+        logger.info("Starting server in development mode...")
+        app.run(host='0.0.0.0', port=8080, debug=True)
+    else:
+        logger.info("Starting server in production mode...")
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=8080)
+        logger.info("Server is running on http://0.0.0.0:8080")
