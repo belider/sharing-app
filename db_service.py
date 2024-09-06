@@ -4,6 +4,11 @@ from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 import logging
 import certifi
+import pickle
+import base64
+from http.cookiejar import Cookie
+from icloudpy import ICloudPyService
+import time
 
 # Настройка логирования
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -11,6 +16,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Устанавливаем уровень логирования на INFO
 
 load_dotenv()
+
+ICLOUD_USERNAME = os.getenv('ICLOUD_USERNAME')
+ICLOUD_PASSWORD = os.getenv('ICLOUD_PASSWORD')
 
 class DatabaseService:
     def __init__(self):
@@ -29,6 +37,7 @@ class DatabaseService:
             self.client = MongoClient(uri, server_api=ServerApi('1'), tlsCAFile=certifi.where())
             self.db = self.client['apple-notes']
             self.notes_collection = self.db['notes']
+            self.sessions_collection = self.db['sessions']
             
             # Проверка подключения
             self.client.admin.command('ping')
@@ -36,6 +45,93 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"An error occurred while connecting to MongoDB: {e}")
             raise
+    
+    def save_session(self, api):
+        try:
+            logger.debug(f"Attempting to save session for user: {ICLOUD_USERNAME}")
+            
+            # Преобразуем cookies в сериализуемый формат
+            cookies_dict = {}
+            for cookie in api.session.cookies:
+                cookies_dict[cookie.name] = {
+                    'value': cookie.value,
+                    'domain': cookie.domain,
+                    'path': cookie.path,
+                    'secure': cookie.secure,
+                    'expires': cookie.expires
+                }
+            
+            session_data = {
+                'session_cookies': cookies_dict,
+                'session_token': getattr(api, 'session_token', None),
+                'client_id': getattr(api, 'client_id', None)
+            }
+            
+            # Добавим временную метку, чтобы обеспечить обновление при каждом сохранении
+            session_data['last_updated'] = time.time()
+            
+            result = self.sessions_collection.update_one(
+                {"username": ICLOUD_USERNAME},
+                {"$set": {"session_data": session_data}},
+                upsert=True
+            )
+            if result.modified_count > 0:
+                logger.info(f"Session updated for user: {ICLOUD_USERNAME}")
+            elif result.upserted_id:
+                logger.info(f"New session inserted for user: {ICLOUD_USERNAME}")
+            else:
+                logger.warning(f"Session was not modified for user: {ICLOUD_USERNAME}")
+            return result.modified_count > 0 or result.upserted_id is not None
+        except Exception as e:
+            logger.error(f"Error saving session: {str(e)}")
+            logger.error(f"Session data: {session_data}")  # Добавим это для отладки
+            return False
+
+    def load_session(self):
+        try:
+            logger.debug(f"Attempting to load session for user: {ICLOUD_USERNAME}")
+            result = self.sessions_collection.find_one({"username": ICLOUD_USERNAME})
+            if result and 'session_data' in result:
+                session_data = result['session_data']
+                
+                from icloudpy import ICloudPyService
+                api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
+                
+                # Обновляем cookies
+                for name, cookie_data in session_data['session_cookies'].items():
+                    cookie = Cookie(
+                        version=0, 
+                        name=name, 
+                        value=cookie_data['value'],
+                        port=None, 
+                        port_specified=False,
+                        domain=cookie_data['domain'],
+                        domain_specified=bool(cookie_data['domain']),
+                        domain_initial_dot=cookie_data['domain'].startswith('.'),
+                        path=cookie_data['path'], 
+                        path_specified=bool(cookie_data['path']),
+                        secure=cookie_data['secure'],
+                        expires=cookie_data['expires'],
+                        discard=False,
+                        comment=None,
+                        comment_url=None,
+                        rest={"HttpOnly": None},
+                        rfc2109=False
+                    )
+                    api.session.cookies.set_cookie(cookie)
+                
+                if 'session_token' in session_data and session_data['session_token']:
+                    api.session_token = session_data['session_token']
+                if 'client_id' in session_data and session_data['client_id']:
+                    api.client_id = session_data['client_id']
+                
+                logger.info(f"Session loaded successfully for user: {ICLOUD_USERNAME}")
+                return api
+            logger.info(f"No session found for user: {ICLOUD_USERNAME}")
+            return None
+        except Exception as e:
+            logger.error(f"Error loading session: {str(e)}")
+            return None
 
     def insert_or_update(self, note_data):
         try:

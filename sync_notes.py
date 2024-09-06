@@ -8,51 +8,41 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def main():
-    api = authenticate_icloud()
-    if not api:
-        print("Failed to authenticate with iCloud")
-        return
-
     # Инициализация менеджера базы данных
     db_service = DatabaseService()
     
-    notes = get_notes_list(api)
-    logger.info(f"Retrieved {len(notes)} notes from iCloud")
+    # Попытка загрузки существующей сессии
+    logger.info("Attempting to load existing session")
+    api = db_service.load_session()
+    
+    if api:
+        logger.info("Existing session loaded, validating...")
+        try:
+            # Проверяем, действительна ли сессия
+            api.authenticate()  # Используем метод authenticate вместо доступа к api.devices
+            logger.info("Existing session is valid")
+        except Exception as e:
+            logger.warning(f"Existing session is invalid: {str(e)}")
+            api = None
 
-    # Обработка каждой заметки
-    for note in notes:
-        logger.info(f"Processing note: {note['title']}")
-        
-        # Создание чанков и эмбеддингов
-        chunks = process_note(note)
-        
-        # Сохранение каждого чанка в базу данных
-        for i, (chunk_text, embeddings) in enumerate(chunks):
-            chunk_data = {
-                "title": f"{note['title']} - {i+1}" if len(chunks) > 1 else note['title'],
-                "text": chunk_text,
-                "embeddings": embeddings,
-                "record_id": f"{note['record_id']}-{i}" if len(chunks) > 1 else note['record_id'],
-                "created_date": note['created_date'],
-                "last_edited_date": note['last_edited_date'],
-                "folder_id": note['folder_id'],
-                "folder_name": note['folder_name'],
-                "owner_id": note['owner_id']
-            }
-            
-            db_service.insert_or_update(chunk_data)
-            logger.info(f"Saved chunk {i+1} for note: {note['title']}")
-
-    logger.info("All notes processed and saved to database")
-
-
-def main():
-    api = authenticate_icloud()
     if not api:
-        logger.error("Failed to authenticate with iCloud")
-        return
-
-    db_service = DatabaseService()
+        logger.info("Attempting to authenticate with iCloud")
+        api = authenticate_icloud()
+        if api:
+            logger.info("Authentication successful")
+            logger.info("Attempting to save new session")
+            if db_service.save_session(api):
+                logger.info("New session saved successfully")
+            else:
+                logger.warning("Failed to save new session")
+        else:
+            logger.error("Authentication failed")
+            return
+    
+    # api = authenticate_icloud()
+    # if not api:
+    #     print("Failed to authenticate with iCloud")
+    #     return
     
     try:
         # Получаем последние даты редактирования из базы данных
@@ -87,6 +77,7 @@ def main():
         logger.error(f"An error occurred during synchronization: {e}")
     finally:
         db_service.close_connection()
+
 
 if __name__ == "__main__":
     main()
