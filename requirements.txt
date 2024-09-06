@@ -7,3 +7,4 @@ tiktoken
 certifi
 flask
 waitress
+requests

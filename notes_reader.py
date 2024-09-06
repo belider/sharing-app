@@ -7,6 +7,7 @@ from icloudpy import ICloudPyService
 from icloudpy.exceptions import ICloudPyFailedLoginException
 from dotenv import load_dotenv
 from decrypt import decrypt_note_text
+import time
 
 # Настройка логирования
 # logging.basicConfig(level=logging.DEBUG)
@@ -17,6 +18,9 @@ load_dotenv()
 
 ICLOUD_USERNAME = os.getenv('ICLOUD_USERNAME')
 ICLOUD_PASSWORD = os.getenv('ICLOUD_PASSWORD')
+SERVER_KEY = os.getenv('SERVER_KEY', '')
+SERVER_URL = os.getenv('SERVER_URL', 'http://localhost:8080')
+
 
 def authenticate_icloud():
     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
@@ -25,8 +29,26 @@ def authenticate_icloud():
         api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
         
         if api.requires_2fa:
-            print("Two-factor authentication required.")
-            code = input("Enter the code you received on one of your approved devices: ")
+            logger.info("Two-factor authentication required.")
+            
+            # Ожидаем ввода кода пользователем через веб-интерфейс
+            auth_url = f"{SERVER_URL}/server_auth?key={SERVER_KEY}"
+            logger.info(f"Please enter the verification code at: {auth_url}")
+            
+            # Ожидаем ввода кода
+            code = None
+            start_time = time.time()
+            while not code and (time.time() - start_time) < 300:  # Ждем максимум 5 минут
+                response = requests.get(f"{SERVER_URL}/icloud_auth_status?key={SERVER_KEY}")
+                if response.status_code == 200:
+                    data = response.json()
+                    code = data.get('code')
+                if not code:
+                    time.sleep(5)  # Пауза перед следующей проверкой
+            
+            if not code:
+                raise ICloudPyFailedLoginException("Timeout waiting for verification code")
+            
             result = api.validate_2fa_code(code)
             logger.debug(f"2FA code validation result: {result}")
 
@@ -38,6 +60,27 @@ def authenticate_icloud():
     except ICloudPyFailedLoginException as e:
         logger.error(f"Login failed: {str(e)}")
         return None
+
+# def authenticate_icloud():
+#     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
+    
+#     try:
+#         api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
+        
+#         if api.requires_2fa:
+#             print("Two-factor authentication required.")
+#             code = input("Enter the code you received on one of your approved devices: ")
+#             result = api.validate_2fa_code(code)
+#             logger.debug(f"2FA code validation result: {result}")
+
+#             if not result:
+#                 raise ICloudPyFailedLoginException("Failed to verify 2FA code")
+
+#         logger.debug("Authentication successful")
+#         return api
+#     except ICloudPyFailedLoginException as e:
+#         logger.error(f"Login failed: {str(e)}")
+#         return None
 
 
 def setup_headers(api):

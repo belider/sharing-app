@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, abort, send_file
+from flask import Flask, request, jsonify, abort, send_file, render_template_string
 import embeddings_service
 from db_service import DatabaseService
 from datetime import datetime
@@ -12,9 +12,60 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 API_KEY = os.getenv('GPTS_API_KEY')
 IS_TEST_ENV = os.getenv('IS_TEST_ENV', 'false').lower() == 'true'
+SERVER_KEY = os.getenv('SERVER_KEY')
 
 app = Flask(__name__)
 db_service = DatabaseService()
+
+# Глобальная переменная для хранения кода подтверждения
+verification_code = None
+
+# HTML шаблон для страницы ввода кода
+AUTH_PAGE_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>iCloud Authentication</title>
+</head>
+<body>
+    <h2>Enter iCloud Verification Code</h2>
+    <form action="/submit_code" method="post">
+        <input type="text" name="code" placeholder="Enter verification code">
+        <input type="hidden" name="key" value="{{ key }}">
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
+"""
+
+@app.route('/icloud_auth')
+def server_auth():
+    key = request.args.get('key')
+    if key != SERVER_KEY:
+        abort(401, description="Unauthorized")
+    return render_template_string(AUTH_PAGE_TEMPLATE, key=key)
+
+@app.route('/submit_code', methods=['POST'])
+def submit_code():
+    global verification_code
+    key = request.form.get('key')
+    if key != SERVER_KEY:
+        abort(401, description="Unauthorized")
+    verification_code = request.form.get('code')
+    return "Code submitted successfully"
+
+@app.route('/icloud_auth_status')
+def icloud_auth_status():
+    key = request.args.get('key')
+    if key != SERVER_KEY:
+        abort(401, description="Unauthorized")
+    global verification_code
+    if verification_code:
+        code = verification_code
+        verification_code = None  # Сбрасываем код после получения
+        return jsonify({"code": code})
+    return jsonify({"code": None})
+
 
 def authenticate_request():
     auth_header = request.headers.get('Authorization')
