@@ -241,7 +241,7 @@ def process_record(record, zone_id, owner_record_name, dsid, headers):
     return processed_note
 
 
-def get_notes_list(api):
+def get_notes_list(api, synced_notes_edited_dates={}):
     try:
         headers, params = setup_headers(api)
         
@@ -256,17 +256,17 @@ def get_notes_list(api):
             # Получение заметок из зоны
             notes = get_zone_changes(zone_id, owner_record_name, params['dsid'], headers)
             
-            # Получение деталей заметок
             for note in notes:
                 note_record_name = note['recordName']
-                note_details = get_note_details(note_record_name, zone_id, owner_record_name, params['dsid'], headers)
+                modification_date = note['fields']['ModificationDate']['value']
                 
-                # Обработка каждой заметки
-                for record in note_details:
-                    processed_note = process_record(record, zone_id, owner_record_name, params['dsid'], headers)
-                    print(json.dumps(processed_note, indent=2, ensure_ascii=False))  # Вывод обработанной заметки в консоль
-                    all_notes.append(processed_note)
-                # break # <--
+                # Проверяем, нужно ли обновлять эту заметку
+                if note_record_name not in synced_notes_edited_dates or modification_date > synced_notes_edited_dates[note_record_name]:
+                    note_details = get_note_details(note_record_name, zone_id, owner_record_name, params['dsid'], headers)
+                    
+                    for record in note_details:
+                        processed_note = process_record(record, zone_id, owner_record_name, params['dsid'], headers)
+                        all_notes.append(processed_note)
         
         return all_notes
 

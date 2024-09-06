@@ -2,7 +2,8 @@ import requests
 import json
 
 def test_search_request():
-    url = "http://localhost:8080/search"
+    # url = "http://localhost:8080/search"
+    url = "https://sharing-app-production.up.railway.app/search"
     headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer JH45ksGfwMZ78swf32fdsbawer35wsxd9SFB32sdQWsdn23SdwsfwsdF32f"  # Добавляем API ключ

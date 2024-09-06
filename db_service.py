@@ -64,6 +64,12 @@ class DatabaseService:
             logger.error(f"An error occurred while inserting/updating note: {e}")
             raise
 
+    def get_last_edited_dates(self):
+        result = {}
+        for note in self.notes_collection.find({}, {'record_id': 1, 'last_edited_date': 1}):
+            result[note['record_id']] = note['last_edited_date']
+        return result
+    
     def close_connection(self):
         if self.client:
             self.client.close()
