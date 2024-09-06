@@ -32,7 +32,7 @@ def authenticate_icloud():
             logger.info("Two-factor authentication required.")
             
             # Ожидаем ввода кода пользователем через веб-интерфейс
-            auth_url = f"{SERVER_URL}/server_auth?key={SERVER_KEY}"
+            auth_url = f"{SERVER_URL}/icloud_auth?key={SERVER_KEY}"
             logger.info(f"Please enter the verification code at: {auth_url}")
             
             # Ожидаем ввода кода
