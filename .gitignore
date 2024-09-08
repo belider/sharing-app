@@ -1,5 +1,7 @@
+icloud_cookies
 logs
 .DS_Store
+*_old.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

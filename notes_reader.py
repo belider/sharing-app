@@ -25,96 +25,40 @@ def authenticate_icloud():
     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
     
     try:
-        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory=None)
-        api.session.session_directory = None
+        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
         
-        # Пытаемся выполнить простой запрос, чтобы проверить авторизацию
-        try:
-            api.devices
-            logger.debug("Authentication successful without 2FA")
-            return api
-        except Exception as e:
-            logger.debug(f"Initial authentication failed: {str(e)}")
-        
-        # Если простой запрос не удался, пробуем 2FA
-        logger.info("Two-factor authentication may be required.")
-        
-        # Ожидаем ввода кода пользователем через веб-интерфейс
-        auth_url = f"{SERVER_URL}/icloud_auth?key={SERVER_KEY}"
-        logger.info(f"Please enter the verification code at: {auth_url}")
-        
-        # Ожидаем ввода кода
-        code = None
-        start_time = time.time()
-        while not code and (time.time() - start_time) < 300:  # Ждем максимум 5 минут
-            response = requests.get(f"{SERVER_URL}/icloud_auth_status?key={SERVER_KEY}")
-            if response.status_code == 200:
-                data = response.json()
-                code = data.get('code')
+        if api.requires_2fa:
+            logger.info("Two-factor authentication required.")
+            
+            # Ожидаем ввода кода пользователем через веб-интерфейс
+            auth_url = f"{SERVER_URL}/icloud_auth?key={SERVER_KEY}"
+            logger.info(f"Please enter the verification code at: {auth_url}")
+            
+            # Ожидаем ввода кода
+            code = None
+            start_time = time.time()
+            while not code and (time.time() - start_time) < 300:  # Ждем максимум 5 минут
+                response = requests.get(f"{SERVER_URL}/icloud_auth_status?key={SERVER_KEY}")
+                if response.status_code == 200:
+                    data = response.json()
+                    code = data.get('code')
+                if not code:
+                    time.sleep(5)  # Пауза перед следующей проверкой
+            
             if not code:
-                time.sleep(5)  # Пауза перед следующей проверкой
-        
-        if not code:
-            raise ICloudPyFailedLoginException("Timeout waiting for verification code")
-        
-        result = api.validate_2fa_code(code)
-        logger.debug(f"2FA code validation result: {result}")
+                raise ICloudPyFailedLoginException("Timeout waiting for verification code")
+            
+            result = api.validate_2fa_code(code)
+            logger.debug(f"2FA code validation result: {result}")
 
-        if not result:
-            raise ICloudPyFailedLoginException("Failed to verify 2FA code")
+            if not result:
+                raise ICloudPyFailedLoginException("Failed to verify 2FA code")
 
-        # Повторно проверяем авторизацию после 2FA
-        try:
-            api.devices
-            logger.debug("Authentication successful after 2FA")
-            return api
-        except Exception as e:
-            raise ICloudPyFailedLoginException(f"Authentication failed after 2FA: {str(e)}")
-
+        logger.debug("Authentication successful")
+        return api
     except ICloudPyFailedLoginException as e:
         logger.error(f"Login failed: {str(e)}")
         return None
-
-# def authenticate_icloud():
-#     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
-    
-#     try:
-#         api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory=None)
-#         api.session.session_directory = None
-        
-#         if api.requires_2fa:
-#             logger.info("Two-factor authentication required.")
-            
-#             # Ожидаем ввода кода пользователем через веб-интерфейс
-#             auth_url = f"{SERVER_URL}/icloud_auth?key={SERVER_KEY}"
-#             logger.info(f"Please enter the verification code at: {auth_url}")
-            
-#             # Ожидаем ввода кода
-#             code = None
-#             start_time = time.time()
-#             while not code and (time.time() - start_time) < 300:  # Ждем максимум 5 минут
-#                 response = requests.get(f"{SERVER_URL}/icloud_auth_status?key={SERVER_KEY}")
-#                 if response.status_code == 200:
-#                     data = response.json()
-#                     code = data.get('code')
-#                 if not code:
-#                     time.sleep(5)  # Пауза перед следующей проверкой
-            
-#             if not code:
-#                 raise ICloudPyFailedLoginException("Timeout waiting for verification code")
-            
-#             result = api.validate_2fa_code(code)
-#             logger.debug(f"2FA code validation result: {result}")
-
-#             if not result:
-#                 raise ICloudPyFailedLoginException("Failed to verify 2FA code")
-
-#         logger.debug("Authentication successful")
-#         return api
-#     except ICloudPyFailedLoginException as e:
-#         logger.error(f"Login failed: {str(e)}")
-#         return None
-
 
 
 # def authenticate_icloud():

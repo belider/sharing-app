@@ -5,6 +5,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 import os
 import logging
+from flask_apscheduler import APScheduler
+from sync_notes import sync_notes
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -16,6 +18,11 @@ SERVER_KEY = os.getenv('SERVER_KEY')
 
 app = Flask(__name__)
 db_service = DatabaseService()
+
+# Инициализация планировщика
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
 
 # Глобальная переменная для хранения кода подтверждения
 verification_code = None
@@ -106,16 +113,21 @@ def search():
         return jsonify({'error': 'No results found or an error occurred'}), 404
 
     # Форматируем результаты в текстовый ответ
-    response_text = f"""Below is a list of notes found for different dates. Newer ones are more important, and information in older notes from more than a month ago may already be outdated. Current date is {datetime.now().strftime('%d %B %Y, %H:%M')}. Use these notes to craft the most helpful response to the query. If context requires referencing older notes. If the question was about the present or futuremake sure to clarify that this is how you noted it earlier. \n\n"""
+    response_text = f"""Below is a list of notes found for different dates. Newer ones are more important, and information in older notes from more than a month ago may already be outdated. Current date is {datetime.now().strftime('%d %B %Y, %H:%M')}. Use these notes to craft the most helpful response to the query. If the question was about the present or future make sure to clarify that this is how you noted it earlier. \n\n"""
     
     for i, result in enumerate(results, start=1):
-        # response_text += f"**Note {i}:** {result['title']}\n"
-        # response_text += f"**Folder:** {result['folder_name']}\n"
-        # response_text += f"**Created date:** {embeddings_service.format_timestamp(result['created_date'])}\n"
-        # response_text += f"**Last modified date:** {embeddings_service.format_timestamp(result['last_edited_date'])}\n"
         response_text += f"""**Note {i} content:**\n```\n{result['text']}\n```\n\n"""
 
     return jsonify({'response': response_text})
+
+# Функция для синхронизации
+@scheduler.task('cron', id='do_sync', minute='*/2') # hour='*'
+def scheduled_sync():
+    with app.app_context():
+        app.logger.info("Starting scheduled sync")
+        sync_notes(db_service)
+        app.logger.info("Scheduled sync completed")
+
 
 if __name__ == "__main__":
     if IS_TEST_ENV:

@@ -7,50 +7,18 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def main():
-    # Инициализация менеджера базы данных
-    db_service = DatabaseService()
-    
+def sync_notes(db_service):
     # Попытка загрузки существующей сессии
     logger.info("Attempting to load existing session")
-    api = db_service.load_session()
+    
+    api = authenticate_icloud()
     
     if api:
-        logger.info("Existing session loaded, validating...")
-        try:
-            # Проверяем валидность сессии без повторной аутентификации
-            if not api.data.get('dsInfo', {}).get('dsid'):
-                raise Exception("Invalid session: missing dsid")
-            logger.info("Existing session is valid")
-            # # Проверяем, действительна ли сессия
-            # api.authenticate()
-            # # Дополнительная проверка: попытка получить список устройств
-            # devices = api.devices
-            # if not devices:
-            #     raise Exception("Failed to retrieve devices list")
-            # logger.info("Existing session is valid")
-        except Exception as e:
-            logger.warning(f"Existing session is invalid: {str(e)}")
-            api = None
-
-    if not api:
-        logger.info("Attempting to authenticate with iCloud")
-        api = authenticate_icloud()
-        if api:
-            logger.info("Authentication successful")
-            logger.info("Attempting to save new session")
-            if db_service.save_session(api):
-                logger.info("New session saved successfully")
-            else:
-                logger.warning("Failed to save new session")
-        else:
-            logger.error("Authentication failed")
-            return
-    
-    # api = authenticate_icloud()
-    # if not api:
-    #     print("Failed to authenticate with iCloud")
-    #     return
+        logger.info("Authentication successful")
+        logger.info("Attempting to save new session")
+    else:
+        logger.error("Authentication failed")
+        return
     
     try:
         # Получаем последние даты редактирования из базы данных
@@ -83,15 +51,3 @@ def main():
 
     except Exception as e:
         logger.error(f"An error occurred during synchronization: {e}")
-    finally:
-        # Сохраняем обновленную сессию после каждого успешного запуска
-        if api:
-            if db_service.save_session(api):
-                logger.info("Session saved successfully after synchronization")
-            else:
-                logger.warning("Failed to save session after synchronization")
-        db_service.close_connection()
-
-
-if __name__ == "__main__":
-    main()
