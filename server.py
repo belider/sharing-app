@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 import os
 import logging
 from flask_apscheduler import APScheduler
-from sync_notes import sync_notes
+from sync_notes import sync_notes, accept_invite
+import re
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -119,6 +120,35 @@ def search():
         response_text += f"""**Note {i} content:**\n```\n{result['text']}\n```\n\n"""
 
     return jsonify({'response': response_text})
+
+@app.route('/accept_shared_folder', methods=['POST'])
+def accept_shared_folder_route():
+    logger.debug("Received request to /accept_shared_folder")
+    
+    data = request.json
+    logger.debug(f"Received data: {data}")
+    
+    if not data or 'url' not in data:
+        logger.error("Missing url parameter")
+        return jsonify({'error': 'Missing url parameter'}), 400
+    
+    url = data['url']
+    guid = re.search(r'([a-zA-Z0-9]+)$', url)
+    
+    if not guid:
+        logger.error(f"Invalid URL format: {url}")
+        return jsonify({'error': 'Invalid URL format'}), 400
+    
+    guid = guid.group(1)
+    logger.debug(f"Extracted GUID: {guid}")
+    
+    try:
+        result = accept_invite(db_service, guid)
+        logger.debug(f"Result from accept_invite: {result}")
+        return jsonify({'message': f'Shared folder invitation processed for GUID: {guid}'}), 200
+    except Exception as e:
+        logger.exception(f"Error processing shared folder invitation: {str(e)}")
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 # Функция для синхронизации
 @scheduler.task('cron', id='do_sync', hour='*') # minute='*/2')

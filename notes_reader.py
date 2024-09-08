@@ -84,7 +84,54 @@ def authenticate_icloud():
 #         return None
 
 
-def setup_headers(api):
+def accept_shared_folder(api: ICloudPyService, short_guid: str):
+    url = 'https://p140-ckdatabasews.icloud.com/database/1/com.apple.cloudkit/production/public/records/accept'
+    
+    dsid = api.data['dsInfo']['dsid']
+    
+    params = {
+        "ckjsBuildVersion": "1954c05c4f41058728b542451db280c466a18f51",
+        "ckjsVersion": "2.6.4",
+        "clientId": api.client_id,
+        "clientBuildNumber": "2420Hotfix12",
+        "clientMasteringNumber": "2420Hotfix12",
+        "dsid": dsid
+    }
+
+    headers = {
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Connection": "keep-alive",
+        "Content-Type": "text/plain",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        "Origin": "https://www.icloud.com",
+        "Referer": "https://www.icloud.com/"
+    }
+
+    cookies = requests.utils.dict_from_cookiejar(api.session.cookies)
+    headers['Cookie'] = '; '.join([f"{key}={value}" for key, value in cookies.items()])
+
+    data = {
+        "shortGUIDs": [{"value": short_guid}]
+    }
+
+    response = requests.post(url, params=params, headers=headers, data=json.dumps(data))
+    
+    # Сохраняем ответ в лог-файл
+    log_filename = f'logs/accept_shared_folder_{short_guid}.json'
+    with open(log_filename, 'w', encoding='utf-8') as log_file:
+        json.dump(response.json(), log_file, ensure_ascii=False, indent=4)
+    
+    if response.status_code == 200:
+        logging.info(f"Successfully accepted shared folder with shortGUID: {short_guid}. Response saved to {log_filename}")
+        return True
+    else:
+        logging.error(f"Failed to accept shared folder. Status code: {response.status_code}. Response saved to {log_filename}")
+        return False
+
+
+def setup_headers(api: ICloudPyService):
     """Создает заголовки и параметры запроса с использованием куки."""
     dsid = api.data['dsInfo']['dsid']
 

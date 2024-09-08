@@ -34,5 +34,40 @@ def test_search_request():
     except requests.exceptions.RequestException as e:
         print(f"Ошибка при выполнении запроса: {e}")
 
+def test_accept_shared_folder():
+    url = "http://localhost:8080/accept_shared_folder"
+    headers = {
+        "Content-Type": "application/json"
+        # Убираем заголовок Authorization
+    }
+
+    # Тестовая ссылка на shared папку
+    # test_url = "https://www.icloud.com/notes/0abDz6qO8xq1frYxdIlW5uUaA"
+    test_url = "https://www.icloud.com/notes/0bfB8DeYxtn1mOo0pJ8NDjNtQ"
+
+    # Тело запроса
+    data = {
+        "url": test_url
+    }
+
+    try:
+        # Отправляем POST-запрос
+        response = requests.post(url, headers=headers, json=data)
+
+        # Проверяем статус-код ответа
+        if response.status_code == 200:
+            print("Успешно принято приглашение в shared папку:")
+            print(response.json())
+        else:
+            print(f"Произошла ошибка: {response.status_code}")
+            print(response.json())
+
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при выполнении запроса: {e}")
+
+# if __name__ == "__main__":
+#     test_search_request()
+
 if __name__ == "__main__":
-    test_search_request()
+    print("\n--- Тестирование принятия приглашения в shared папку ---")
+    test_accept_shared_folder()

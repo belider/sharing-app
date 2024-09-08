@@ -1,4 +1,4 @@
-from notes_reader import authenticate_icloud, get_notes_list
+from notes_reader import authenticate_icloud, get_notes_list, accept_shared_folder
 from db_service import DatabaseService
 from embeddings_service import process_note
 import logging
@@ -51,3 +51,21 @@ def sync_notes(db_service):
 
     except Exception as e:
         logger.error(f"An error occurred during synchronization: {e}")
+
+def accept_invite(db_service, short_guid):
+    logger.info(f"Attempting to accept invite for shared folder with shortGUID: {short_guid}")
+    
+    # Попытка загрузки существующей сессии
+    api = authenticate_icloud()
+    
+    if api:
+        logger.info("Authentication successful")
+        result = accept_shared_folder(api, short_guid)
+        if result:
+            logger.info(f"Successfully accepted shared folder with shortGUID: {short_guid}")
+            # Здесь можно добавить дополнительную логику, например, немедленную синхронизацию новой папки
+            sync_notes(db_service)
+        else:
+            logger.error(f"Failed to accept shared folder with shortGUID: {short_guid}")
+    else:
+        logger.error("Authentication failed, unable to accept invite")
