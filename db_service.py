@@ -44,45 +44,53 @@ class DatabaseService:
             logger.error(f"An error occurred while connecting to MongoDB: {e}")
             raise
     
+    def _get_session_env(self):
+        """Возвращает тип среды выполнения."""
+        return 'test' if os.getenv('IS_TEST_ENV', 'false').lower() == 'true' else 'prod'
+    
     def save_session(self, api):
         try:
-            logger.debug(f"Attempting to save session for user: {ICLOUD_USERNAME}")
+            session_env = self._get_session_env()
+            logger.debug(f"Attempting to save session for user: {ICLOUD_USERNAME} in {session_env} environment")
             
-            # Преобразуем cookies в сериализуемый формат
-            cookies_dict = {}
-            for cookie in api.session.cookies:
-                cookies_dict[cookie.name] = {
-                    'value': cookie.value,
-                    'domain': cookie.domain,
-                    'path': cookie.path,
-                    'secure': cookie.secure,
-                    'expires': cookie.expires
-                }
-            
-            # Сохраняем данные сессии
             session_data = {
-                'session_cookies': cookies_dict,
                 'session_token': getattr(api, 'session_token', None),
-                'client_id': getattr(api, 'client_id', None),
-                'dsid': api.data['dsInfo']['dsid'],
+                'session_id': api.session.headers.get('X-Apple-ID-Session-Id'),
+                'trust_token': getattr(api, 'trust_token', None),
                 'scnt': api.session.headers.get('scnt'),
-                'session_id': api.session.headers.get('X-Apple-ID-Session-Id')
+                'aimd': getattr(api, 'aimd', None),
+                'dsid': api.data.get('dsInfo', {}).get('dsid'),
+                'client_id': api.client_id,
+                'validation_data': getattr(api, 'validation_data', {}),
+                'auth_token': getattr(api, 'auth_token', {}),
+                'tokens': getattr(api, 'tokens', {}),
             }
+
+            # Сохраняем cookies
+            cookies_dict = {cookie.name: {
+                'value': cookie.value,
+                'domain': cookie.domain,
+                'path': cookie.path,
+                'secure': cookie.secure,
+                'expires': cookie.expires
+            } for cookie in api.session.cookies}
             
-            # Добавим временную метку
+            session_data['cookies'] = cookies_dict
+            
+            # Добавляем временную метку
             session_data['last_updated'] = time.time()
             
             result = self.sessions_collection.update_one(
-                {"username": ICLOUD_USERNAME},
+                {"username": ICLOUD_USERNAME, "session_env": session_env},
                 {"$set": {"session_data": session_data}},
                 upsert=True
             )
             
             if result.modified_count > 0 or result.upserted_id:
-                logger.info(f"Session saved/updated for user: {ICLOUD_USERNAME}")
+                logger.info(f"Session saved/updated for user: {ICLOUD_USERNAME} in {session_env} environment")
                 return True
             else:
-                logger.warning(f"Session was not modified for user: {ICLOUD_USERNAME}")
+                logger.warning(f"Session was not modified for user: {ICLOUD_USERNAME} in {session_env} environment")
                 return False
         except Exception as e:
             logger.error(f"Error saving session: {str(e)}")
@@ -90,15 +98,24 @@ class DatabaseService:
 
     def load_session(self):
         try:
-            logger.debug(f"Attempting to load session for user: {ICLOUD_USERNAME}")
-            result = self.sessions_collection.find_one({"username": ICLOUD_USERNAME})
+            session_env = self._get_session_env()
+            logger.debug(f"Attempting to load session for user: {ICLOUD_USERNAME} in {session_env} environment")
+            result = self.sessions_collection.find_one({"username": ICLOUD_USERNAME, "session_env": session_env})
             if result and 'session_data' in result:
                 session_data = result['session_data']
                 
-                api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
+                api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory='')
+                
+                # Восстанавливаем данные сессии
+                api.session_token = session_data.get('session_token')
+                api.trust_token = session_data.get('trust_token')
+                api.client_id = session_data.get('client_id')
+                api.validation_data = session_data.get('validation_data', {})
+                api.auth_token = session_data.get('auth_token', {})
+                api.tokens = session_data.get('tokens', {})
                 
                 # Восстанавливаем cookies
-                for name, cookie_data in session_data['session_cookies'].items():
+                for name, cookie_data in session_data.get('cookies', {}).items():
                     cookie = Cookie(
                         version=0, 
                         name=name, 
@@ -120,18 +137,17 @@ class DatabaseService:
                     )
                     api.session.cookies.set_cookie(cookie)
                 
-                # Восстанавливаем другие данные сессии
-                api.session_token = session_data.get('session_token')
-                api.client_id = session_data.get('client_id')
-                api.data = {'dsInfo': {'dsid': session_data.get('dsid')}}
+                # Восстанавливаем заголовки сессии
                 api.session.headers.update({
+                    'X-Apple-ID-Session-Id': session_data.get('session_id'),
                     'scnt': session_data.get('scnt'),
-                    'X-Apple-ID-Session-Id': session_data.get('session_id')
                 })
                 
-                logger.info(f"Session loaded successfully for user: {ICLOUD_USERNAME}")
+                api.data = {'dsInfo': {'dsid': session_data.get('dsid')}}
+                
+                logger.info(f"Session loaded successfully for user: {ICLOUD_USERNAME} in {session_env} environment")
                 return api
-            logger.info(f"No session found for user: {ICLOUD_USERNAME}")
+            logger.info(f"No session found for user: {ICLOUD_USERNAME} in {session_env} environment")
             return None
         except Exception as e:
             logger.error(f"Error loading session: {str(e)}")

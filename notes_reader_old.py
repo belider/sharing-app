@@ -16,12 +16,14 @@ load_dotenv()
 
 ICLOUD_USERNAME = os.getenv('ICLOUD_USERNAME')
 ICLOUD_PASSWORD = os.getenv('ICLOUD_PASSWORD')
+ENV_TYPE = 'test' if os.getenv('IS_TEST_ENV', 'false').lower() == 'true' else 'prod'
 
 def authenticate_icloud():
-    logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
+    # logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
+    logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME} in {ENV_TYPE} environment")
     
     try:
-        api = PyiCloudService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
+        api = PyiCloudService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory='')
         
         if api.requires_2fa:
             print("Two-factor authentication required.")
