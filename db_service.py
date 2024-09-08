@@ -4,8 +4,6 @@ from pymongo.server_api import ServerApi
 from dotenv import load_dotenv
 import logging
 import certifi
-import pickle
-import base64
 from http.cookiejar import Cookie
 from icloudpy import ICloudPyService
 import time
@@ -61,13 +59,17 @@ class DatabaseService:
                     'expires': cookie.expires
                 }
             
+            # Сохраняем данные сессии
             session_data = {
                 'session_cookies': cookies_dict,
                 'session_token': getattr(api, 'session_token', None),
-                'client_id': getattr(api, 'client_id', None)
+                'client_id': getattr(api, 'client_id', None),
+                'dsid': api.data['dsInfo']['dsid'],
+                'scnt': api.session.headers.get('scnt'),
+                'session_id': api.session.headers.get('X-Apple-ID-Session-Id')
             }
             
-            # Добавим временную метку, чтобы обеспечить обновление при каждом сохранении
+            # Добавим временную метку
             session_data['last_updated'] = time.time()
             
             result = self.sessions_collection.update_one(
@@ -75,16 +77,15 @@ class DatabaseService:
                 {"$set": {"session_data": session_data}},
                 upsert=True
             )
-            if result.modified_count > 0:
-                logger.info(f"Session updated for user: {ICLOUD_USERNAME}")
-            elif result.upserted_id:
-                logger.info(f"New session inserted for user: {ICLOUD_USERNAME}")
+            
+            if result.modified_count > 0 or result.upserted_id:
+                logger.info(f"Session saved/updated for user: {ICLOUD_USERNAME}")
+                return True
             else:
                 logger.warning(f"Session was not modified for user: {ICLOUD_USERNAME}")
-            return result.modified_count > 0 or result.upserted_id is not None
+                return False
         except Exception as e:
             logger.error(f"Error saving session: {str(e)}")
-            logger.error(f"Session data: {session_data}")  # Добавим это для отладки
             return False
 
     def load_session(self):
@@ -94,10 +95,9 @@ class DatabaseService:
             if result and 'session_data' in result:
                 session_data = result['session_data']
                 
-                from icloudpy import ICloudPyService
                 api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
                 
-                # Обновляем cookies
+                # Восстанавливаем cookies
                 for name, cookie_data in session_data['session_cookies'].items():
                     cookie = Cookie(
                         version=0, 
@@ -120,10 +120,14 @@ class DatabaseService:
                     )
                     api.session.cookies.set_cookie(cookie)
                 
-                if 'session_token' in session_data and session_data['session_token']:
-                    api.session_token = session_data['session_token']
-                if 'client_id' in session_data and session_data['client_id']:
-                    api.client_id = session_data['client_id']
+                # Восстанавливаем другие данные сессии
+                api.session_token = session_data.get('session_token')
+                api.client_id = session_data.get('client_id')
+                api.data = {'dsInfo': {'dsid': session_data.get('dsid')}}
+                api.session.headers.update({
+                    'scnt': session_data.get('scnt'),
+                    'X-Apple-ID-Session-Id': session_data.get('session_id')
+                })
                 
                 logger.info(f"Session loaded successfully for user: {ICLOUD_USERNAME}")
                 return api

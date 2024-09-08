@@ -19,7 +19,7 @@ def main():
         logger.info("Existing session loaded, validating...")
         try:
             # Проверяем, действительна ли сессия
-            api.authenticate()  # Используем метод authenticate вместо доступа к api.devices
+            api.authenticate()
             logger.info("Existing session is valid")
         except Exception as e:
             logger.warning(f"Existing session is invalid: {str(e)}")
