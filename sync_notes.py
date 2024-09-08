@@ -18,13 +18,17 @@ def main():
     if api:
         logger.info("Existing session loaded, validating...")
         try:
-            # Проверяем, действительна ли сессия
-            api.authenticate()
-            # Дополнительная проверка: попытка получить список устройств
-            devices = api.devices
-            if not devices:
-                raise Exception("Failed to retrieve devices list")
+            # Проверяем валидность сессии без повторной аутентификации
+            if not api.data.get('dsInfo', {}).get('dsid'):
+                raise Exception("Invalid session: missing dsid")
             logger.info("Existing session is valid")
+            # # Проверяем, действительна ли сессия
+            # api.authenticate()
+            # # Дополнительная проверка: попытка получить список устройств
+            # devices = api.devices
+            # if not devices:
+            #     raise Exception("Failed to retrieve devices list")
+            # logger.info("Existing session is valid")
         except Exception as e:
             logger.warning(f"Existing session is invalid: {str(e)}")
             api = None
@@ -81,11 +85,11 @@ def main():
         logger.error(f"An error occurred during synchronization: {e}")
     finally:
         # Сохраняем обновленную сессию после каждого успешного запуска
-        # if api and api.is_trusted_session:
-        #     if db_service.save_session(api):
-        #         logger.info("Session saved successfully after synchronization")
-        #     else:
-        #         logger.warning("Failed to save session after synchronization")
+        if api:
+            if db_service.save_session(api):
+                logger.info("Session saved successfully after synchronization")
+            else:
+                logger.warning("Failed to save session after synchronization")
         db_service.close_connection()
 
 

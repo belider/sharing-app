@@ -55,7 +55,7 @@ class DatabaseService:
                 'trust_token': getattr(api, 'trust_token', None),
                 'scnt': api.session.headers.get('scnt'),
                 'aimd': getattr(api, 'aimd', None),
-                'dsid': api.data.get('dsInfo', {}).get('dsid'),
+                'dsid': api.data['dsInfo']['dsid'],
                 'client_id': api.client_id,
                 'validation_data': getattr(api, 'validation_data', {}),
                 'auth_token': getattr(api, 'auth_token', {}),
