@@ -101,6 +101,7 @@ class DatabaseService:
                 session_data = result['session_data']
                 
                 api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory='')
+                api.session.session_directory = None
                 
                 # Восстанавливаем данные сессии
                 api.session_token = session_data.get('session_token')

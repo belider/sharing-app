@@ -21,12 +21,12 @@ ICLOUD_PASSWORD = os.getenv('ICLOUD_PASSWORD')
 SERVER_KEY = os.getenv('SERVER_KEY', '')
 SERVER_URL = os.getenv('SERVER_URL', 'http://localhost:8080')
 
-
 def authenticate_icloud():
     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
     
     try:
-        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD)
+        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory='')
+        api.session.session_directory = None
         
         if api.requires_2fa:
             logger.info("Two-factor authentication required.")
