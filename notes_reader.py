@@ -42,6 +42,7 @@ def authenticate_icloud():
                 if response.status_code == 200:
                     data = response.json()
                     code = data.get('code')
+                    logger.debug(f"Auth status success, 2FA code: {response.text}")
                 if not code:
                     time.sleep(5)  # Пауза перед следующей проверкой
             

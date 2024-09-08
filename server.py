@@ -121,7 +121,7 @@ def search():
     return jsonify({'response': response_text})
 
 # Функция для синхронизации
-@scheduler.task('cron', id='do_sync', minute='*/2') # hour='*'
+@scheduler.task('cron', id='do_sync', hour='*') # minute='*/2')
 def scheduled_sync():
     with app.app_context():
         app.logger.info("Starting scheduled sync")
