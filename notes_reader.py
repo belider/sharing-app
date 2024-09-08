@@ -25,7 +25,7 @@ def authenticate_icloud():
     logger.debug(f"Attempting to authenticate with username: {ICLOUD_USERNAME}")
     
     try:
-        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory='')
+        api = ICloudPyService(ICLOUD_USERNAME, ICLOUD_PASSWORD, cookie_directory=None)
         api.session.session_directory = None
         
         if api.requires_2fa:
