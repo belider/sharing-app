@@ -74,17 +74,29 @@ def icloud_auth_status():
         return jsonify({"code": code})
     return jsonify({"code": None})
 
-
-def authenticate_request():
-    auth_header = request.headers.get('Authorization')
-    if auth_header != f"Bearer {API_KEY}":
-        abort(401, description="Unauthorized: Invalid API key")
-
 @app.route('/privacy', methods=['GET'])
 def privacy_policy():
     return send_file('privacy_policy.html')
 
+# def authenticate_request():
+#     auth_header = request.headers.get('Authorization')
+#     if auth_header != f"Bearer {API_KEY}":
+#         abort(401, description="Unauthorized: Invalid API key")
+
+from functools import wraps
+from flask import request, abort
+
+def require_api_key(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if auth_header != f"Bearer {API_KEY}":
+            abort(401, description="Unauthorized: Invalid API key")
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/search', methods=['POST'])
+@require_api_key
 def search():
     data = request.json
 
@@ -122,6 +134,7 @@ def search():
     return jsonify({'response': response_text})
 
 @app.route('/accept_shared_folder', methods=['POST'])
+@require_api_key
 def accept_shared_folder_route():
     logger.debug("Received request to /accept_shared_folder")
     
@@ -149,6 +162,7 @@ def accept_shared_folder_route():
     except Exception as e:
         logger.exception(f"Error processing shared folder invitation: {str(e)}")
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
 
 # Функция для синхронизации
 @scheduler.task('cron', id='do_sync', hour='*') # minute='*/2')

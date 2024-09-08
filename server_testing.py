@@ -10,7 +10,7 @@ def test_search_request():
     }
 
     # Текст для поиска
-    search_query = "Какие самые приоритетные направления роста в Searadar?"
+    search_query = "Какие у меня сейчас челленджы на работе?"
 
     # Тело запроса
     data = {
@@ -37,8 +37,8 @@ def test_search_request():
 def test_accept_shared_folder():
     url = "http://localhost:8080/accept_shared_folder"
     headers = {
-        "Content-Type": "application/json"
-        # Убираем заголовок Authorization
+        "Content-Type": "application/json",
+        "Authorization": "Bearer JH45ksGfwMZ78swf32fdsbawer35wsxd9SFB32sdQWsdn23SdwsfwsdF32f"  # Добавляем API ключ
     }
 
     # Тестовая ссылка на shared папку
@@ -69,5 +69,8 @@ def test_accept_shared_folder():
 #     test_search_request()
 
 if __name__ == "__main__":
-    print("\n--- Тестирование принятия приглашения в shared папку ---")
-    test_accept_shared_folder()
+    # print("\n--- Тестирование принятия приглашения в shared папку ---")
+    # test_accept_shared_folder()
+    
+    print("\n--- Тестирование поиска с Bearer авторизацией ---")
+    test_search_request()
