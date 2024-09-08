@@ -44,13 +44,9 @@ class DatabaseService:
             logger.error(f"An error occurred while connecting to MongoDB: {e}")
             raise
     
-    def _get_session_env(self):
-        """Возвращает тип среды выполнения."""
-        return 'test' if os.getenv('IS_TEST_ENV', 'false').lower() == 'true' else 'prod'
-    
     def save_session(self, api):
         try:
-            session_env = self._get_session_env()
+            session_env = 'test' if os.getenv('IS_TEST_ENV', 'false').lower() == 'true' else 'prod'
             logger.debug(f"Attempting to save session for user: {ICLOUD_USERNAME} in {session_env} environment")
             
             session_data = {
@@ -98,7 +94,7 @@ class DatabaseService:
 
     def load_session(self):
         try:
-            session_env = self._get_session_env()
+            session_env = 'test' if os.getenv('IS_TEST_ENV', 'false').lower() == 'true' else 'prod'
             logger.debug(f"Attempting to load session for user: {ICLOUD_USERNAME} in {session_env} environment")
             result = self.sessions_collection.find_one({"username": ICLOUD_USERNAME, "session_env": session_env})
             if result and 'session_data' in result:
@@ -111,7 +107,7 @@ class DatabaseService:
                 api.trust_token = session_data.get('trust_token')
                 api.client_id = session_data.get('client_id')
                 api.validation_data = session_data.get('validation_data', {})
-                api.auth_token = session_data.get('auth_token', {})
+                api.auth_token = session_data.get('auth_token', {}),
                 api.tokens = session_data.get('tokens', {})
                 
                 # Восстанавливаем cookies

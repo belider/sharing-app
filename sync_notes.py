@@ -20,6 +20,10 @@ def main():
         try:
             # Проверяем, действительна ли сессия
             api.authenticate()
+            # Дополнительная проверка: попытка получить список устройств
+            devices = api.devices
+            if not devices:
+                raise Exception("Failed to retrieve devices list")
             logger.info("Existing session is valid")
         except Exception as e:
             logger.warning(f"Existing session is invalid: {str(e)}")
@@ -76,6 +80,12 @@ def main():
     except Exception as e:
         logger.error(f"An error occurred during synchronization: {e}")
     finally:
+        # Сохраняем обновленную сессию после каждого успешного запуска
+        # if api and api.is_trusted_session:
+        #     if db_service.save_session(api):
+        #         logger.info("Session saved successfully after synchronization")
+        #     else:
+        #         logger.warning("Failed to save session after synchronization")
         db_service.close_connection()
 
 
